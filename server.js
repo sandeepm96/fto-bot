@@ -32,9 +32,10 @@ server.route({
     method: 'POST',
     path: '/starter-issue',
     handler: function (request, reply) {
+        var owner, repo, branch, sha, ctr=0;
+        
+        //Parsing the url received from frontend to get the owner, repo and branch name
         var arr = request.payload.url.split('/');
-        var ctr = 0;
-        var owner, repo, branch, sha;
         for(var i=0;i<arr.length;i++){
           if(arr[i]=="github.com"){
             owner=arr[i+1];
@@ -48,30 +49,39 @@ server.route({
             break;
           }
         }
-        if(ctr==3){
+        
+        //Fetching data via http requests on github api after owner, repo and branch name are extracted successfully
+        if(ctr==3) {
             var options = {
               host:'api.github.com',
               path: '/repos/' + owner + '/' + repo + '/branches/' + branch,
               method: 'GET',
               headers: {'user-agent':'Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)'}
             };
+            
+            //First http request to get branch data
             var request = https.request(options, function(response){
               var body = '';
               response.on('data',function(chunk){
                   body+=chunk;
               });
+                
               response.on('end',function(){
                   var branch_data = JSON.parse(body);
-                  sha = branch_data.commit.sha;
+                  sha = branch_data.commit.sha; 
+                  
                   if(sha){
+                      //Second http request to get latest commit data from sha received in branch data
                       options.path = '/repos/' + owner + '/' + repo + '/commits/' + sha;
                       var req = https.request(options, function(res){
                         var body1 = '';
                         res.on('data',function(chunk){
                             body1+=chunk;
                         });
+                          
                         res.on('end',function(){
                             var commit_data = JSON.parse(body1);
+                            //Extracting the required data from the whole commit data
                             var refined_data = {
                                 "sha": commit_data.sha,
                                 "message": commit_data.commit.message,
@@ -79,6 +89,7 @@ server.route({
                                 "stats": commit_data.stats,
                                 "files": []
                             }
+                            
                             for(var i=0;i<commit_data.files.length;i++){
                               var f = {};
                               f.filename = commit_data.files[i].filename;
@@ -89,28 +100,32 @@ server.route({
                               f.path = commit_data.files[i].blob_url;
                               refined_data['files'].push(f);
                             }
-                            console.log(JSON.stringify(commit_data));
-                            console.log(refined_data);
-                            reply(JSON.stringify(refined_data));
+                            console.log(JSON.stringify(commit_data));    //Logging the whole commit data for reference
+                            console.log(refined_data);      //Also logging the extracted data
+                            reply(refined_data);     //Sending the extracted data to frontend
                         });
                       });
+                      
                       req.on('error', function(e) {
                         console.error('Error: '+e);
                       });
                       req.end();
                   }
+                  
                   else {
-                    reply("Commit not found !");
+                    reply("Commit not found !");       //If sha is undefined
                   }
               });
             });
+            
             request.on('error', function(e) {
               console.error('Error: '+e);
             });
             request.end();
         }
+        
         else {
-          reply("Wrong URL !");
+          reply("Wrong URL !");         //If owner, repo, branch name could not be parsed from url (improper url) 
         }
     }
 });
