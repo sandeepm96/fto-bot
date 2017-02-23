@@ -1,10 +1,9 @@
 {
   "name": "fto-bot",
   "version": "1.0.0",
-  "description": "first timer only issue bot",
-  "main": "app.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "hapi": "^16.1.0",
